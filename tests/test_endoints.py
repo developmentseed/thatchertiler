@@ -41,3 +41,11 @@ def test_map(app, data_dir, dataset):
     response = app.get(f"/map?url={os.path.join(data_dir, dataset)}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
+
+
+@pytest.mark.parametrize("dataset", datasets)
+def test_wmts(app, data_dir, dataset):
+    """test /wmts endpoint"""
+    response = app.get(f"/WMTSCapabilities.xml?url={os.path.join(data_dir, dataset)}")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/xml"

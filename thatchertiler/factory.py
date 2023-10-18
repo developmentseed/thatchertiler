@@ -1,7 +1,10 @@
 """thatchertiler.factory."""
 
 import abc
+import json
+import pathlib
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 from urllib.parse import urlencode
 
@@ -24,6 +27,36 @@ DEFAULT_TEMPLATES = Jinja2Templates(
     directory="",
     loader=jinja2.ChoiceLoader([jinja2.PackageLoader(__package__, "templates")]),
 )
+
+tms_data = pathlib.Path(__file__).parent.joinpath("data", "WebMercatorQuad.json")
+
+
+class MediaType(str, Enum):
+    """Responses Media types formerly known as MIME types."""
+
+    unknown = "application/x-binary"
+    avif = "image/avif"
+    tif = "image/tiff; application=geotiff"
+    jp2 = "image/jp2"
+    png = "image/png"
+    pngraw = "image/png"
+    jpeg = "image/jpeg"
+    jpg = "image/jpg"
+    webp = "image/webp"
+    npy = "application/x-binary"
+    xml = "application/xml"
+    json = "application/json"
+    geojson = "application/geo+json"
+    html = "text/html"
+    text = "text/plain"
+    pbf = "application/x-protobuf"
+    mvt = "application/x-protobuf"
+
+
+class XMLResponse(Response):
+    """XML Response"""
+
+    media_type = "application/xml"
 
 
 @dataclass  # type: ignore
@@ -63,6 +96,9 @@ class TilerFactory:
     extensions: List[FactoryExtension] = field(default_factory=list)
 
     templates: Jinja2Templates = DEFAULT_TEMPLATES
+
+    with_wmts: bool = False
+    with_map: bool = False
 
     def __post_init__(self):
         """Post Init: register route and configure specific options."""
@@ -133,7 +169,12 @@ class TilerFactory:
         self._register_metadata()
         self._register_tiles()
         self._register_style()
-        self._register_map()
+
+        if self.with_map:
+            self._register_map()
+
+        if self.with_wmts:
+            self._register_wmts()
 
     def _register_metadata(self):
         """register /metadata endpoint."""
@@ -162,7 +203,11 @@ class TilerFactory:
                 if src.tile_compression != Compression.NONE:
                     headers["Content-Encoding"] = src.tile_compression.name.lower()
 
-            return Response(data, media_type="application/x-protobuf", headers=headers)
+                return Response(
+                    data,
+                    media_type=MediaType[src.tile_type.name.lower()].value,
+                    headers=headers,
+                )
 
         @self.router.get(
             "/tilejson.json",
@@ -381,3 +426,67 @@ class TilerFactory:
                 },
                 media_type="text/html",
             )
+
+    def _register_wmts(self):
+        """add /wmts endpoint."""
+
+        @self.router.get("/WMTSCapabilities.xml", response_class=XMLResponse)
+        async def wmts(request: Request, dataset=Depends(self.path_dependency)):
+            """OGC WMTS endpoint."""
+            async with Reader(dataset) as src:
+                route_params = {
+                    "z": "{TileMatrix}",
+                    "x": "{TileCol}",
+                    "y": "{TileRow}",
+                }
+                tiles_url = self.url_for(request, "tiles_endpoint", **route_params)
+
+                qs_key_to_remove = [
+                    "service",
+                    "request",
+                ]
+                qs = [
+                    (key, value)
+                    for (key, value) in request.query_params._list
+                    if key.lower() not in qs_key_to_remove
+                ]
+                if qs:
+                    tiles_url += f"?{urlencode(qs)}"
+
+                with open(tms_data, "r") as tms:
+                    tile_matrix_set = json.loads(tms.read())
+
+                zooms = list(map(str, range(src.minzoom, src.maxzoom + 1)))
+                matrices = filter(
+                    lambda matrix: matrix["id"] in zooms,
+                    tile_matrix_set["tileMatrices"],
+                )
+
+                tileMatrix = []
+                for matrix in list(matrices):
+                    tm = f"""<TileMatrix>
+                        <ows:Identifier>{matrix['id']}</ows:Identifier>
+                        <ScaleDenominator>{matrix['scaleDenominator']}</ScaleDenominator>
+                        <TopLeftCorner>{matrix['pointOfOrigin'][0]} {matrix['pointOfOrigin'][1]}</TopLeftCorner>
+                        <TileWidth>{matrix['tileWidth']}</TileWidth>
+                        <TileHeight>{matrix['tileHeight']}</TileHeight>
+                        <MatrixWidth>{matrix['matrixWidth']}</MatrixWidth>
+                        <MatrixHeight>{matrix['matrixHeight']}</MatrixHeight>
+                    </TileMatrix>"""
+                    tileMatrix.append(tm)
+
+                media_type = MediaType[src.tile_type.name.lower()].value
+
+                return self.templates.TemplateResponse(
+                    "wmts.xml",
+                    {
+                        "request": request,
+                        "tiles_endpoint": tiles_url,
+                        "bounds": src.bounds,
+                        "tileMatrix": tileMatrix,
+                        "title": "PMTiles Archive",
+                        "layer_name": "pmtiles",
+                        "media_type": media_type,
+                    },
+                    media_type="application/xml",
+                )

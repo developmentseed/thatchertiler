@@ -37,7 +37,7 @@ if settings.cors_origins:
         allow_headers=["*"],
     )
 
-tiler = TilerFactory()
+tiler = TilerFactory(with_map=True, with_wmts=True)
 app.include_router(tiler.router, tags=["PMTiles"])
 
 
