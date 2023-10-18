@@ -23,7 +23,6 @@ test = [
     "pytest-cov",
     "pytest-asyncio",
     "httpx",
-    "brotlipy",
 ]
 dev = [
     "pre-commit",

@@ -5,8 +5,6 @@ import os
 import pytest
 from starlette.testclient import TestClient
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
-
 
 @pytest.fixture
 def set_env(monkeypatch):
@@ -26,3 +24,9 @@ def app(set_env) -> TestClient:
     from thatchertiler.main import app
 
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def data_dir() -> str:
+    """fixture directory."""
+    return os.path.join(os.path.dirname(__file__), "fixtures")
