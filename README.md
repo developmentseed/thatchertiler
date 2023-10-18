@@ -27,25 +27,23 @@ While the original idea behind *PMTiles* is to create a single file which can be
 python -m pip install pip -U
 git clone https://github.com/developmentseed/thatchertiler.git
 cd thatchertiler
-python -m pip install -e .
+python -m pip install -e ".[server]"
 ```
 
 ## Launch
 
 ```bash
-python -m pip install uvicorn
-
 uvicorn thatchertiler.main:app --port 8080 --reload
 
 >> INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
 ```
 
-`http://127.0.0.1:8080/docs`
+`http://127.0.0.1:8080/api.html`
 
 ![](https://user-images.githubusercontent.com/10407788/231717328-6d0608fa-145b-480e-ba48-629b0e4e3e97.png)
 
 
-`http://127.0.0.1:8080/index.html?url=https://protomaps.github.io/PMTiles/protomaps(vector)ODbL_firenze.pmtiles`
+`http://127.0.0.1:8080/map?url=https://protomaps.github.io/PMTiles/protomaps(vector)ODbL_firenze.pmtiles`
 
 ![](https://user-images.githubusercontent.com/10407788/231720737-87cf14a9-35b3-4451-a183-37b80dc16e93.png)
 
