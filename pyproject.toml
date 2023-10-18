@@ -11,8 +11,25 @@ dynamic = ["version"]
 dependencies = [
     "aiopmtiles @ git+https://github.com/developmentseed/aiopmtiles.git",
     "uvicorn",
-    "fastapi",
-    "jinja2",
+    "fastapi>=0.100.0",
+    "jinja2>=2.11.2,<4.0.0",
+    "pydantic>=2.4,<3.0",
+    "pydantic-settings~=2.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "httpx",
+    "brotlipy",
+]
+dev = [
+    "pre-commit",
+]
+server = [
+    "uvicorn[standard]>=0.12.0,<0.19.0",
 ]
 
 [build-system]
@@ -21,7 +38,6 @@ build-backend = "flit_core.buildapi"
 
 [tool.flit.module]
 name = "thatchertiler"
-
 
 [tool.coverage.run]
 branch = true
